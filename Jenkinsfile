@@ -76,16 +76,5 @@ pipeline {
                 }
             }
         }
-
-        stage('Trigger ArgoCD Sync') {
-            steps {
-                script {
-                    sh """
-                    argocd login <ARGOCD_SERVER> --username admin --password <ARGOCD_PASSWORD>
-                    argocd app sync tiling-app
-                    """
-                }
-            }
-        }
     }
 }
