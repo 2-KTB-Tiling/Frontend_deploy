@@ -64,7 +64,7 @@ pipeline {
 
         stage('Update GitHub Deployment YAML') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'github-credentials', 
+                withCredentials([usernamePassword(credentialsId: 'github_token', 
                     usernameVariable: 'GIT_USERNAME', 
                     passwordVariable: 'GIT_PASSWORD')]) {
                     script {
