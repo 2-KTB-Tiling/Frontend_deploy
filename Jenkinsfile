@@ -64,17 +64,24 @@ pipeline {
 
         stage('Update GitHub Deployment YAML') {
             steps {
-                script {
-                    sh """
-                    git clone https://github.com/2-KTB-Tiling/k8s-manifests.git
-                    cd k8s-manifests
-                    sed -i 's|image: ${DOCKER_HUB_REPO}:.*|image: ${DOCKER_HUB_REPO}:${NEW_TAG}|' frontend-deployment.yaml
-                    git add frontend-deployment.yaml
-                    git commit -m "Update frontend image to ${NEW_TAG}"
-                    git push origin main
-                    """
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', 
+                    usernameVariable: 'GIT_USERNAME', 
+                    passwordVariable: 'GIT_PASSWORD')]) {
+                    script {
+                        sh """
+                        git clone https://github.com/2-KTB-Tiling/k8s-manifests.git
+                        cd k8s-manifests
+                        sed -i 's|image: luckyprice1103/tiling-frontend:.*|image: luckyprice1103/tiling-frontend:${NEW_TAG}|' frontend-deployment.yaml
+                        git config --global user.email "jenkins@yourdomain.com"
+                        git config --global user.name "Jenkins"
+                        git add frontend-deployment.yaml
+                        git commit -m "Update frontend image to ${NEW_TAG}"
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/2-KTB-Tiling/k8s-manifests.git main
+                        """
+                    }
                 }
             }
         }
+
     }
 }
