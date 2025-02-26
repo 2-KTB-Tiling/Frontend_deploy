@@ -6,7 +6,7 @@ pipeline {
     }
 
     stages {
-        stage('clean workspace') {
+        stage('Clean Workspace') {
             steps {
                 cleanWs()
             }
@@ -30,12 +30,59 @@ pipeline {
             }
         }
 
+        stage('Get Latest Version & Set New Tag') {
+            steps {
+                script {
+                    def latestTag = sh(script: "curl -s https://hub.docker.com/v2/repositories/${DOCKER_HUB_REPO}/tags | jq -r '.results | map(select(.name | test(\"v[0-9]+\\\\.[0-9]+\"))) | sort_by(.last_updated) | .[-1].name'", returnStdout: true).trim()
+                    
+                    def newVersion
+                    if (latestTag == "null" || latestTag == "") {
+                        newVersion = "v1.0"  // 첫 번째 버전
+                    } else {
+                        def versionParts = latestTag.replace("v", "").split("\\.")
+                        def major = versionParts[0].toInteger()
+                        def minor = versionParts[1].toInteger() + 1
+                        newVersion = "v${major}.${minor}"
+                    }
+
+                    env.NEW_TAG = newVersion
+                    echo "New Image Tag: ${NEW_TAG}"
+                }
+            }
+        }
+
         stage('Build & Push Frontend Image') {
             steps {
                 script {
                     sh """
-                    docker build -t ${DOCKER_HUB_REPO}:latest -f Dockerfile .
-                    docker push ${DOCKER_HUB_REPO}:latest
+                    docker build -t ${DOCKER_HUB_REPO}:${NEW_TAG} -f Dockerfile .
+                    docker push ${DOCKER_HUB_REPO}:${NEW_TAG}
+                    """
+                }
+            }
+        }
+
+        stage('Update GitHub Deployment YAML') {
+            steps {
+                script {
+                    sh """
+                    git clone https://github.com/2-KTB-Tiling/k8s-manifests.git
+                    cd k8s-manifests
+                    sed -i 's|image: ${DOCKER_HUB_REPO}:.*|image: ${DOCKER_HUB_REPO}:${NEW_TAG}|' frontend-deployment.yaml
+                    git add frontend-deployment.yaml
+                    git commit -m "Update frontend image to ${NEW_TAG}"
+                    git push origin main
+                    """
+                }
+            }
+        }
+
+        stage('Trigger ArgoCD Sync') {
+            steps {
+                script {
+                    sh """
+                    argocd login <ARGOCD_SERVER> --username admin --password <ARGOCD_PASSWORD>
+                    argocd app sync tiling-app
                     """
                 }
             }
